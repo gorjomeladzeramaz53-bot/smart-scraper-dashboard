@@ -10,7 +10,7 @@ A modern, high-performance web scraper powered by FastAPI, Playwright, and AI. I
 ## 🚀 How to Run Locally
 
 1. Clone the repository:
-git clone https://github.com/YOUR_GITHUB_USERNAME/ai-scraper-fastapi.git
+git clone https://github.com/https://github.com/gorjomeladzeramaz53-bot/ai-scraper-fastapi.git
 
 2. Create and activate a virtual environment:
 python -m venv venv
