@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="ka">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Web Scraper Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-900 text-white min-h-screen flex flex-col items-center p-6">
+    
+    <div class="w-full max-w-3xl bg-gray-800 p-8 rounded-2xl shadow-2xl border border-gray-700 my-6">
+        <h1 class="text-3xl font-bold mb-6 text-center text-blue-400">🤖 AI Web Scraper Pro</h1>
+        
+        <!-- Input Form -->
+        <div class="flex flex-col sm:flex-row gap-3 mb-6">
+            <input 
+                type="url" 
+                id="urlInput" 
+                placeholder="ჩაწერეთ ვებსაიტის მისამართი (მაგ: https://quotes.toscrape.com)" 
+                class="flex-1 px-4 py-3 bg-gray-900 border border-gray-600 rounded-xl focus:outline-none focus:border-blue-500 text-white"
+            >
+            <button 
+                onclick="startScraping()" 
+                id="scrapeBtn"
+                class="bg-blue-600 hover:bg-blue-500 text-white font-semibold px-6 py-3 rounded-xl transition duration-200 shadow-lg"
+            >
+                სქრეიპინგი
+            </button>
+        </div>
+
+        <!-- Loading Status -->
+        <div id="statusMessage" class="text-center text-yellow-400 mb-4 font-medium hidden">
+            მიმდინარეობს სქრეიპინგი და AI ანალიზი... გთხოვთ მოიცადოთ ⏳
+        </div>
+
+        <!-- Result Cards Section (Initially Hidden) -->
+        <div id="resultSection" class="hidden space-y-4">
+            <div class="flex flex-wrap justify-between items-center gap-2 border-b border-gray-700 pb-3">
+                <h2 class="text-xl font-semibold text-gray-200">📊 ანალიზის შედეგები</h2>
+                <div class="flex gap-2">
+                    <button 
+                        onclick="downloadJSON()" 
+                        class="bg-green-600 hover:bg-green-500 text-white text-sm font-semibold px-4 py-2 rounded-lg transition duration-200 shadow"
+                    >
+                        📥 JSON
+                    </button>
+                    <button 
+                        onclick="downloadCSV()" 
+                        class="bg-emerald-700 hover:bg-emerald-600 text-white text-sm font-semibold px-4 py-2 rounded-lg transition duration-200 shadow"
+                    >
+                        📊 CSV (Excel)
+                    </button>
+                </div>
+            </div>
+
+            <!-- Cards Grid -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div class="bg-gray-900 p-4 rounded-xl border border-gray-700">
+                    <p class="text-xs text-gray-400">გვერდის სათაური</p>
+                    <p id="resTitle" class="text-lg font-bold text-blue-300 mt-1">-</p>
+                </div>
+                <div class="bg-gray-900 p-4 rounded-xl border border-gray-700">
+                    <p class="text-xs text-gray-400">სიტყვების რაოდენობა / კითხვის დრო</p>
+                    <p id="resWords" class="text-lg font-bold text-green-300 mt-1">-</p>
+                </div>
+            </div>
+
+            <div class="bg-gray-900 p-4 rounded-xl border border-gray-700">
+                <p class="text-xs text-gray-400 mb-1">AI შეჯამება</p>
+                <p id="resSummary" class="text-sm text-gray-200">-</p>
+            </div>
+
+            <div class="bg-gray-900 p-4 rounded-xl border border-gray-700">
+                <p class="text-xs text-gray-400 mb-2">საკვანძო სიტყვები</p>
+                <div id="resKeywords" class="flex flex-wrap gap-2"></div>
+            </div>
+        </div>
+
+        <!-- History Section -->
+        <div class="mt-8 pt-6 border-t border-gray-700">
+            <h3 class="text-md font-semibold text-gray-300 mb-3">სქრეიპინგის ისტორია</h3>
+            <ul id="historyList" class="space-y-2 text-sm text-gray-400">
+                <li class="text-gray-500 italic">ისტორია ჯერ ცარიელია.</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        let lastResultData = null;
+        let scrapingHistory = [];
+
+        async function startScraping() {
+            const url = document.getElementById('urlInput').value;
+            const scrapeBtn = document.getElementById('scrapeBtn');
+            const statusMessage = document.getElementById('statusMessage');
+            const resultSection = document.getElementById('resultSection');
+
+            if (!url) {
+                alert('გთხოვთ, შეიყვანოთ ვებსაიტის მისამართი!');
+                return;
+            }
+
+            statusMessage.classList.remove('hidden');
+            resultSection.classList.add('hidden');
+            scrapeBtn.disabled = true;
+
+            try {
+                const response = await fetch(`/ai-scrape?url=${encodeURIComponent(url)}`);
+                const textResponse = await response.text();
+                
+                let data;
+                try {
+                    data = JSON.parse(textResponse);
+                } catch (e) {
+                    throw new Error("სერვერმა დააბრუნა არასწორი პასუხი: " + textResponse);
+                }
+
+                if (response.ok) {
+                    lastResultData = data;
+                    
+                    document.getElementById('resTitle').textContent = data.page_title || 'უსათაურო';
+                    document.getElementById('resWords').textContent = `${data.total_words} სიტყვა (~${data.key_insights.reading_time_minutes} წთ)`;
+                    document.getElementById('resSummary').textContent = data.ai_smart_summary;
+
+                    const keywordsContainer = document.getElementById('resKeywords');
+                    keywordsContainer.innerHTML = '';
+                    data.key_insights.top_keywords.forEach(kw => {
+                        const span = document.createElement('span');
+                        span.className = 'bg-blue-900/50 text-blue-300 px-3 py-1 rounded-full text-xs border border-blue-700';
+                        span.textContent = kw;
+                        keywordsContainer.appendChild(span);
+                    });
+
+                    resultSection.classList.remove('hidden');
+                    addToHistory(data.url, data.page_title);
+                } else {
+                    alert(`შეცდომა: ${data.detail || 'უცნობი შეცდომა'}`);
+                }
+            } catch (error) {
+                alert(`კავშირის შეცდომა: ${error.message}`);
+            } finally {
+                statusMessage.classList.add('hidden');
+                scrapeBtn.disabled = false;
+            }
+        }
+
+        function downloadJSON() {
+            if (!lastResultData) return;
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(lastResultData, null, 4));
+            const downloadAnchor = document.createElement('a');
+            downloadAnchor.setAttribute("href", dataStr);
+            downloadAnchor.setAttribute("download", "scraper_result.json");
+            document.body.appendChild(downloadAnchor);
+            downloadAnchor.click();
+            downloadAnchor.remove();
+        }
+
+        function downloadCSV() {
+            if (!lastResultData) return;
+            const url = `/download-csv?url=${encodeURIComponent(lastResultData.url)}&title=${encodeURIComponent(lastResultData.page_title)}&words=${lastResultData.total_words}&summary=${encodeURIComponent(lastResultData.ai_smart_summary)}`;
+            window.location.href = url;
+        }
+
+        function addToHistory(url, title) {
+            const historyList = document.getElementById('historyList');
+            if (scrapingHistory.length === 0) {
+                historyList.innerHTML = '';
+            }
+            scrapingHistory.unshift({ url, title });
+            if (scrapingHistory.length > 5) scrapingHistory.pop();
+
+            historyList.innerHTML = '';
+            scrapingHistory.forEach(item => {
+                const li = document.createElement('li');
+                li.className = 'bg-gray-900 p-2.5 rounded-lg border border-gray-700 flex justify-between items-center';
+                li.innerHTML = `<span class="truncate max-w-xs text-gray-300 font-medium">${item.title}</span> <span class="text-xs text-blue-400 truncate max-w-[150px]">${item.url}</span>`;
+                historyList.appendChild(li);
+            });
+        }
+    </script>
+</body>
+</html>
